@@ -121,10 +121,14 @@ def validate_transactions_csv(df: pd.DataFrame) -> Tuple[bool, List[str]]:
     # 6. Validate amounts
     invalid_amount_count = 0
     negative_payment_count = 0
+    zero_amount_count = 0
     for idx, row in df.iterrows():
         try:
             amt = to_decimal(row["amount"])
-            if amt <= 0 and str(row.get("transaction_type", "")).strip().upper() == "PAYMENT":
+            t_type = str(row.get("transaction_type", "")).strip().upper()
+            if amt == Decimal("0.00"):
+                zero_amount_count += 1
+            elif amt < 0 and t_type == TransactionType.PAYMENT.value:
                 negative_payment_count += 1
         except Exception:
             invalid_amount_count += 1
@@ -132,7 +136,9 @@ def validate_transactions_csv(df: pd.DataFrame) -> Tuple[bool, List[str]]:
     if invalid_amount_count > 0:
         errors.append(f"Found {invalid_amount_count} transactions with invalid or unparseable monetary amounts.")
     if negative_payment_count > 0:
-        errors.append(f"Found {negative_payment_count} PAYMENT transactions with non-positive or negative amounts.")
+        errors.append(f"Found {negative_payment_count} PAYMENT transactions with negative amounts.")
+    if zero_amount_count > 0:
+        errors.append(f"Found {zero_amount_count} transactions with zero monetary amounts.")
 
     # 7. Validate dates
     invalid_dates = 0

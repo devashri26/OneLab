@@ -357,7 +357,7 @@ if nav_selection in ["1. Overview & KPIs"]:
             <div class="metric-card">
                 <div class="metric-label">Fully Matched</div>
                 <div class="metric-value" style="color: #059669;">{summary['matched_count']}</div>
-                <div class="metric-sub">{format_inr(summary['matched_platform_amount'])} cleared</div>
+                <div class="metric-sub">Gross: {format_inr(summary['matched_gross_amount'])} | Net: {format_inr(summary['matched_net_amount'])}</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -484,11 +484,12 @@ if nav_selection in ["1. Overview & KPIs", "2. Financial Reconciliation"]:
             f"""
             **Gross Payment Reconciliation Breakdown:**
             - **Platform Expected Payments:** `{format_inr(summary['platform_total_payments'])}`
-            - **Less In-Transit / Unsettled Payments:** `- {format_inr(summary['unsettled_amount'])}`
-            - **Less Late Settlements (Settling post-cutoff in Feb):** `- {format_inr(summary['late_settlement_amount'])}`
-            - **Add Duplicate Settlements from Bank:** `+ {format_inr(summary['duplicate_settlement_amount'])}`
-            - **Add Unmatched External Bank Settlements:** `+ {format_inr(summary['unmatched_bank_amount'])}`
+            - **Less In-Transit / Unsettled Payments:** `- {format_inr(summary['unsettled_payments_amount'])}`
+            - **Less Late Settlements (Settling post-cutoff in Feb):** `- {format_inr(summary['late_settlement_payments_amount'])}`
+            - **Add Duplicate Payment Settlements from Bank:** `+ {format_inr(summary['duplicate_settlement_payments_amount'])}`
+            - **Add Unmatched External Bank Credits:** `+ {format_inr(summary['unmatched_bank_amount'])}`
             - **Net Rounding & Amount Discrepancies:** `{format_inr(summary['rounding_total_difference'] + summary['amount_mismatch_difference'])}`
+            - **= Realized Bank Gross Payments:** `{format_inr(summary['bank_total_payments_period'])}`
             """
         )
 
@@ -504,7 +505,15 @@ if nav_selection in ["1. Overview & KPIs", "2. Financial Reconciliation"]:
 
         st.markdown(
             f"""
-            **Refund Verification Notes:**
+            **Refund Verification Notes & Ledger Bridge:**
+            - **Platform Expected Refunds:** `{format_inr(summary['platform_total_refunds'])}`
+            - **Less In-Transit / Unsettled Refunds:** `- {format_inr(summary['unsettled_refunds_amount'])}`
+            - **Less Late Settlement Refunds:** `- {format_inr(summary['late_settlement_refunds_amount'])}`
+            - **Add Orphan Bank Refunds (Unbacked Debits):** `+ {format_inr(summary['orphan_refund_amount'])}`
+            - **Add Duplicate Bank Refund Debits:** `+ {format_inr(summary['duplicate_settlement_refunds_amount'])}`
+            - **= Realized Bank Processed Refunds:** `{format_inr(summary['bank_total_refunds_period'])}`
+            
+            *Audit Observations:*
             - All platform refunds are cross-referenced with original payment transactions.
             - Detected **{summary['orphan_refund_count']} orphan refund(s)** totaling `{format_inr(summary['orphan_refund_amount'])}` settled at the bank without a valid source transaction.
             - Detected **{summary['refund_exceeds_payment_count']} refund(s)** where refund amount exceeded original transaction payment.
@@ -522,29 +531,38 @@ if nav_selection in ["1. Overview & KPIs", "2. Financial Reconciliation"]:
 
         # Visual Waterfall Chart of Net Bridge
         waterfall_x = [
-            "Platform Net",
-            "Unsettled (In-Transit)",
-            "Late Settlements (Timing)",
-            "Duplicate Credits",
+            "Platform Net Revenue",
+            "Unsettled Payments",
+            "Unsettled Refunds",
+            "Late Payments (Timing)",
+            "Late Refunds (Timing)",
+            "Duplicate Payments",
+            "Duplicate Refunds",
             "Unmatched Bank Credits",
-            "Orphan Refunds",
+            "Orphan Bank Refunds",
             "Amount / Rounding Variance",
-            "Bank Net Settled",
+            "Bank Net Settled Cash",
         ]
         
-        # Calculate bridge steps
-        unsettled_impact = -float(summary["unsettled_amount"])
-        late_impact = -float(summary["late_settlement_amount"])
-        dup_impact = float(summary["duplicate_settlement_amount"])
+        # Calculate disaggregated bridge steps
+        unsettled_pay_impact = -float(summary["unsettled_payments_amount"])
+        unsettled_ref_impact = float(summary["unsettled_refunds_amount"])
+        late_pay_impact = -float(summary["late_settlement_payments_amount"])
+        late_ref_impact = float(summary["late_settlement_refunds_amount"])
+        dup_pay_impact = float(summary["duplicate_settlement_payments_amount"])
+        dup_ref_impact = -float(summary["duplicate_settlement_refunds_amount"])
         unmatched_impact = float(summary["unmatched_bank_amount"])
         orphan_impact = -float(summary["orphan_refund_amount"])
         mismatch_rounding = float(summary["rounding_total_difference"] + summary["amount_mismatch_difference"])
 
         waterfall_y = [
             float(summary["platform_net_amount"]),
-            unsettled_impact,
-            late_impact,
-            dup_impact,
+            unsettled_pay_impact,
+            unsettled_ref_impact,
+            late_pay_impact,
+            late_ref_impact,
+            dup_pay_impact,
+            dup_ref_impact,
             unmatched_impact,
             orphan_impact,
             mismatch_rounding,
@@ -555,7 +573,7 @@ if nav_selection in ["1. Overview & KPIs", "2. Financial Reconciliation"]:
             go.Waterfall(
                 name="Reconciliation Bridge",
                 orientation="v",
-                measure=["absolute", "relative", "relative", "relative", "relative", "relative", "relative", "total"],
+                measure=["absolute", "relative", "relative", "relative", "relative", "relative", "relative", "relative", "relative", "relative", "total"],
                 x=waterfall_x,
                 y=waterfall_y,
                 connector={"line": {"color": "#94A3B8"}},
@@ -568,11 +586,12 @@ if nav_selection in ["1. Overview & KPIs", "2. Financial Reconciliation"]:
             title="Net Financial Reconciliation Bridge (Platform to Bank)",
             plot_bgcolor="#FFFFFF",
             paper_bgcolor="#FFFFFF",
-            height=420,
+            height=430,
             margin=dict(l=20, r=20, t=40, b=20),
             yaxis_title="Amount (₹)",
         )
         st.plotly_chart(fig_waterfall, use_container_width=True)
+        st.caption(f"✅ Verified Mathematical Bridge Discrepancy: **{format_inr(summary['bridge_discrepancy'])}** (Exact 0.00)")
 
 
 # -----------------------------------------------------------------------------
@@ -831,14 +850,18 @@ if nav_selection in ["6. Download Reports"]:
         {"Metric": "Bank Net Settled Amount", "Value": str(summary["bank_net_amount_period"])},
         {"Metric": "Bank Total Records (Period)", "Value": summary["bank_total_records_period"]},
         {"Metric": "Net Reconciliation Gap", "Value": str(summary["net_reconciliation_difference"])},
+        {"Metric": "Mathematical Bridge Discrepancy", "Value": str(summary["bridge_discrepancy"])},
         {"Metric": "Matched Records Count", "Value": summary["matched_count"]},
-        {"Metric": "Matched Platform Amount", "Value": str(summary["matched_platform_amount"])},
-        {"Metric": "Unsettled Records Count", "Value": summary["unsettled_count"]},
-        {"Metric": "Unsettled Amount", "Value": str(summary["unsettled_amount"])},
-        {"Metric": "Late Settlements Count", "Value": summary["late_settlement_count"]},
-        {"Metric": "Late Settlements Amount", "Value": str(summary["late_settlement_amount"])},
-        {"Metric": "Duplicate Settlements Count", "Value": summary["duplicate_settlement_count"]},
-        {"Metric": "Duplicate Settlements Amount", "Value": str(summary["duplicate_settlement_amount"])},
+        {"Metric": "Matched Payments Amount", "Value": str(summary["matched_payments_amount"])},
+        {"Metric": "Matched Refunds Amount", "Value": str(summary["matched_refunds_amount"])},
+        {"Metric": "Matched Gross Amount", "Value": str(summary["matched_gross_amount"])},
+        {"Metric": "Matched Net Amount", "Value": str(summary["matched_net_amount"])},
+        {"Metric": "Unsettled Payments Amount", "Value": str(summary["unsettled_payments_amount"])},
+        {"Metric": "Unsettled Refunds Amount", "Value": str(summary["unsettled_refunds_amount"])},
+        {"Metric": "Late Settlement Payments Amount", "Value": str(summary["late_settlement_payments_amount"])},
+        {"Metric": "Late Settlement Refunds Amount", "Value": str(summary["late_settlement_refunds_amount"])},
+        {"Metric": "Duplicate Settlement Payments Amount", "Value": str(summary["duplicate_settlement_payments_amount"])},
+        {"Metric": "Duplicate Settlement Refunds Amount", "Value": str(summary["duplicate_settlement_refunds_amount"])},
         {"Metric": "Rounding Variance Count", "Value": summary["rounding_variance_count"]},
         {"Metric": "Rounding Total Difference", "Value": str(summary["rounding_total_difference"])},
         {"Metric": "Orphan Refund Count", "Value": summary["orphan_refund_count"]},

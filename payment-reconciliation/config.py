@@ -29,6 +29,7 @@ class ReconciliationStatus(str, Enum):
     AMOUNT_MISMATCH = "AMOUNT_MISMATCH"
     UNMATCHED_BANK_ENTRY = "UNMATCHED_BANK_ENTRY"
     REFUND_EXCEEDS_PAYMENT = "REFUND_EXCEEDS_PAYMENT"
+    POST_CUTOFF_TRANSACTION = "POST_CUTOFF_TRANSACTION"
 
 # Required Schema Definitions
 REQUIRED_TRANSACTION_COLUMNS = [
@@ -50,15 +51,16 @@ REQUIRED_SETTLEMENT_COLUMNS = [
 
 # Color mapping for UI status indicators
 STATUS_COLORS = {
-    ReconciliationStatus.MATCHED.value: "#059669",             # Green
-    ReconciliationStatus.LATE_SETTLEMENT.value: "#D97706",      # Amber
-    ReconciliationStatus.ROUNDING_VARIANCE.value: "#2563EB",    # Royal Blue
-    ReconciliationStatus.DUPLICATE_SETTLEMENT.value: "#DC2626", # Crimson Red
-    ReconciliationStatus.ORPHAN_REFUND.value: "#7C3AED",        # Purple
-    ReconciliationStatus.UNSETTLED.value: "#F59E0B",            # Orange
-    ReconciliationStatus.AMOUNT_MISMATCH.value: "#E11D48",      # Rose Red
-    ReconciliationStatus.UNMATCHED_BANK_ENTRY.value: "#475569", # Slate
-    ReconciliationStatus.REFUND_EXCEEDS_PAYMENT.value: "#991B1B",# Dark Red
+    ReconciliationStatus.MATCHED.value: "#059669",                  # Emerald Green
+    ReconciliationStatus.LATE_SETTLEMENT.value: "#D97706",           # Amber
+    ReconciliationStatus.ROUNDING_VARIANCE.value: "#2563EB",         # Royal Blue
+    ReconciliationStatus.DUPLICATE_SETTLEMENT.value: "#DC2626",      # Crimson Red
+    ReconciliationStatus.ORPHAN_REFUND.value: "#7C3AED",             # Purple
+    ReconciliationStatus.UNSETTLED.value: "#F59E0B",                 # Orange
+    ReconciliationStatus.AMOUNT_MISMATCH.value: "#E11D48",           # Rose Red
+    ReconciliationStatus.UNMATCHED_BANK_ENTRY.value: "#475569",      # Slate
+    ReconciliationStatus.REFUND_EXCEEDS_PAYMENT.value: "#991B1B",     # Dark Red
+    ReconciliationStatus.POST_CUTOFF_TRANSACTION.value: "#64748B",   # Slate Blue
 }
 
 # Human-readable status labels
@@ -72,4 +74,5 @@ STATUS_LABELS = {
     ReconciliationStatus.AMOUNT_MISMATCH.value: "Amount Mismatch",
     ReconciliationStatus.UNMATCHED_BANK_ENTRY.value: "Unmatched Bank Settlement",
     ReconciliationStatus.REFUND_EXCEEDS_PAYMENT.value: "Refund Exceeds Original Payment",
+    ReconciliationStatus.POST_CUTOFF_TRANSACTION.value: "Post-Cutoff Transaction (Next Period)",
 }

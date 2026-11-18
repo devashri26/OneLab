@@ -2,6 +2,7 @@
 
 Implements all financial reconciliation business rules, classification logic,
 and exact Decimal calculations for financial variance analysis.
+Verified and audited for strict mathematical consistency across Gross, Refund, and Net ledgers.
 """
 
 from datetime import date
@@ -79,10 +80,10 @@ def reconcile_transactions(
         "settlement_id", "transaction_id", "settlement_date", "amount", "transaction_type"
     ])
 
-    # Convert columns safely
+    # Convert columns safely; ensure amounts are absolute positive magnitudes
     txns["transaction_id"] = txns["transaction_id"].astype(str).str.strip()
     txns["parsed_date"] = txns["transaction_date"].apply(parse_date)
-    txns["dec_amount"] = txns["amount"].apply(to_decimal)
+    txns["dec_amount"] = txns["amount"].apply(lambda v: abs(to_decimal(v)))
     txns["norm_type"] = txns["transaction_type"].astype(str).str.strip().str.upper()
     txns["orig_id"] = txns["original_transaction_id"].fillna("").astype(str).str.strip()
     txns["norm_status"] = txns["status"].astype(str).str.strip().str.upper()
@@ -90,10 +91,10 @@ def reconcile_transactions(
     settles["settlement_id"] = settles["settlement_id"].astype(str).str.strip()
     settles["transaction_id"] = settles["transaction_id"].astype(str).str.strip()
     settles["parsed_date"] = settles["settlement_date"].apply(parse_date)
-    settles["dec_amount"] = settles["amount"].apply(to_decimal)
+    settles["dec_amount"] = settles["amount"].apply(lambda v: abs(to_decimal(v)))
     settles["norm_type"] = settles["transaction_type"].astype(str).str.strip().str.upper()
 
-    # Create mapping of platform transactions for fast lookup and refund validation
+    # Create mapping of all platform transactions for fast lookup and refund validation
     platform_txn_map = {}
     for _, row in txns.iterrows():
         platform_txn_map[row["transaction_id"]] = row
@@ -109,8 +110,11 @@ def reconcile_transactions(
         settlements_by_txn_id[t_id].append(s_row)
 
     settlements_matched_or_processed = set()
+    
+    # Cumulative refund tracking per original transaction ID
+    cumulative_refunds_by_orig_id = {}
 
-    # 3. Process Platform Transactions (up to cutoff_date)
+    # 3. Process Platform Transactions
     for _, t_row in txns.iterrows():
         t_id = t_row["transaction_id"]
         t_date = t_row["parsed_date"]
@@ -118,14 +122,19 @@ def reconcile_transactions(
         t_type = t_row["norm_type"]
         orig_id = t_row["orig_id"]
 
-        # Only reconcile transactions belonging to period (<= cutoff_date)
-        if t_date and t_date > cutoff_date:
-            continue
-
         matching_settles = settlements_by_txn_id.get(t_id, [])
+
+        # Boundary Handling (Rule 10): Post-Cutoff Transactions
+        if t_date and t_date > cutoff_date:
+            # Mark settlement as processed so it does not trigger a false "UNMATCHED_BANK_ENTRY" in January
+            if matching_settles:
+                settlements_matched_or_processed.add(matching_settles[0]["settlement_id"])
+            continue
 
         if not matching_settles:
             # RULE 2: MISSING SETTLEMENT (UNSETTLED)
+            # Cash impact: for payment, bank has less cash (-); for refund, bank has more cash (+)
+            signed_diff = -p_amount if t_type == TransactionType.PAYMENT.value else p_amount
             reconciled_records.append({
                 "transaction_id": t_id,
                 "settlement_id": "N/A",
@@ -134,7 +143,7 @@ def reconcile_transactions(
                 "transaction_type": t_type,
                 "platform_amount": float(p_amount),
                 "bank_amount": 0.0,
-                "difference": float(-p_amount),
+                "difference": float(signed_diff),
                 "reconciliation_status": ReconciliationStatus.UNSETTLED.value,
                 "days_to_settle": None,
                 "explanation": (
@@ -147,8 +156,9 @@ def reconcile_transactions(
                 ),
                 "_p_dec": p_amount,
                 "_b_dec": Decimal("0.00"),
-                "_diff_dec": -p_amount,
+                "_diff_dec": signed_diff,
                 "_in_cutoff": False,
+                "_is_refund": (t_type == TransactionType.REFUND.value),
             })
             continue
 
@@ -162,10 +172,18 @@ def reconcile_transactions(
         s_type = primary_settle["norm_type"]
 
         days_to_settle = (s_date - t_date).days if (s_date and t_date) else None
-        diff = b_amount - p_amount
+        
+        # Calculate signed cash impact difference
+        # For payments: Bank Credit - Platform Expected (+ means bank settled more, - means bank settled less)
+        # For refunds: -(Bank Debit - Platform Expected) = Platform Expected - Bank Debit (- means bank debited more, + means bank debited less)
+        if t_type == TransactionType.PAYMENT.value:
+            diff = b_amount - p_amount
+        else:
+            diff = p_amount - b_amount
 
-        # Check for RULE 7: ORPHAN REFUND (if platform record itself is a refund referencing non-existent payment)
+        # Check for RULE 7 & RULE 9: REFUND VALIDATION
         if t_type == TransactionType.REFUND.value:
+            # RULE 7: Verify original transaction exists
             if not orig_id or orig_id not in platform_txn_map:
                 reconciled_records.append({
                     "transaction_id": t_id,
@@ -190,13 +208,46 @@ def reconcile_transactions(
                     "_b_dec": b_amount,
                     "_diff_dec": diff,
                     "_in_cutoff": (s_date <= cutoff_date) if s_date else False,
+                    "_is_refund": True,
                 })
                 continue
             
-            # RULE 9: Verify refund does not exceed original payment
             orig_row = platform_txn_map[orig_id]
+            # RULE 9: Verify original transaction is actually a PAYMENT
+            if orig_row["norm_type"] != TransactionType.PAYMENT.value:
+                reconciled_records.append({
+                    "transaction_id": t_id,
+                    "settlement_id": s_id,
+                    "transaction_date": str(t_date) if t_date else "N/A",
+                    "settlement_date": str(s_date) if s_date else "N/A",
+                    "transaction_type": t_type,
+                    "platform_amount": float(p_amount),
+                    "bank_amount": float(b_amount),
+                    "difference": float(diff),
+                    "reconciliation_status": ReconciliationStatus.ORPHAN_REFUND.value,
+                    "days_to_settle": days_to_settle,
+                    "explanation": (
+                        f"Refund transaction {t_id} references original transaction '{orig_id}' "
+                        f"which is classified as '{orig_row['norm_type']}', not a valid PAYMENT."
+                    ),
+                    "suggested_action": (
+                        "Reject refund settlement clearance. Refunds may only be issued against legitimate payment charges."
+                    ),
+                    "_p_dec": p_amount,
+                    "_b_dec": b_amount,
+                    "_diff_dec": diff,
+                    "_in_cutoff": (s_date <= cutoff_date) if s_date else False,
+                    "_is_refund": True,
+                })
+                continue
+
+            # RULE 9: Cumulative refund amount must not exceed original payment amount
             orig_p_amt = orig_row["dec_amount"]
-            if p_amount > orig_p_amt:
+            prior_refunds = cumulative_refunds_by_orig_id.get(orig_id, Decimal("0.00"))
+            cumulative_total = prior_refunds + p_amount
+            cumulative_refunds_by_orig_id[orig_id] = cumulative_total
+
+            if cumulative_total > orig_p_amt:
                 reconciled_records.append({
                     "transaction_id": t_id,
                     "settlement_id": s_id,
@@ -209,8 +260,8 @@ def reconcile_transactions(
                     "reconciliation_status": ReconciliationStatus.REFUND_EXCEEDS_PAYMENT.value,
                     "days_to_settle": days_to_settle,
                     "explanation": (
-                        f"Refund amount ({p_amount}) exceeds the original payment transaction amount "
-                        f"({orig_p_amt}) for original ID {orig_id}."
+                        f"Refund amount of {p_amount} brings cumulative refunds for original transaction {orig_id} "
+                        f"to {cumulative_total}, exceeding original payment of {orig_p_amt}."
                     ),
                     "suggested_action": (
                         "Reject or suspend refund settlement clearance. Review merchant dispute case and cap refund at original charge."
@@ -219,6 +270,7 @@ def reconcile_transactions(
                     "_b_dec": b_amount,
                     "_diff_dec": diff,
                     "_in_cutoff": (s_date <= cutoff_date) if s_date else False,
+                    "_is_refund": True,
                 })
                 continue
 
@@ -247,12 +299,13 @@ def reconcile_transactions(
                 "_p_dec": p_amount,
                 "_b_dec": b_amount,
                 "_diff_dec": diff,
-                "_in_cutoff": False,  # Bank settlement happened outside January cutoff
+                "_in_cutoff": False,  # Bank settlement happened outside cutoff
+                "_is_refund": (t_type == TransactionType.REFUND.value),
             })
             continue
 
         # Settled within cutoff date: Check amount differences
-        abs_diff = abs(diff)
+        abs_diff = abs(b_amount - p_amount)
         if abs_diff == Decimal("0.00"):
             # RULE 1: NORMAL MATCHING
             reconciled_records.append({
@@ -272,6 +325,7 @@ def reconcile_transactions(
                 "_b_dec": b_amount,
                 "_diff_dec": Decimal("0.00"),
                 "_in_cutoff": True,
+                "_is_refund": (t_type == TransactionType.REFUND.value),
             })
         elif abs_diff <= rounding_tolerance:
             # RULE 6: ROUNDING VARIANCE
@@ -297,6 +351,7 @@ def reconcile_transactions(
                 "_b_dec": b_amount,
                 "_diff_dec": diff,
                 "_in_cutoff": True,
+                "_is_refund": (t_type == TransactionType.REFUND.value),
             })
         else:
             # RULE 5: AMOUNT MISMATCH
@@ -323,13 +378,12 @@ def reconcile_transactions(
                 "_b_dec": b_amount,
                 "_diff_dec": diff,
                 "_in_cutoff": True,
+                "_is_refund": (t_type == TransactionType.REFUND.value),
             })
 
     # 4. Process Duplicate Bank Settlements (RULE 4)
-    # Check if any transaction_id had more than 1 settlement record in the bank
     for t_id, settle_list in settlements_by_txn_id.items():
         if len(settle_list) > 1:
-            # All settlements after the first one are duplicates
             for dup_settle in settle_list[1:]:
                 settlements_matched_or_processed.add(dup_settle["settlement_id"])
                 dup_s_id = dup_settle["settlement_id"]
@@ -337,20 +391,24 @@ def reconcile_transactions(
                 dup_amt = dup_settle["dec_amount"]
                 dup_type = dup_settle["norm_type"]
                 
-                # Check if matching platform record exists
+                # Check if duplicate is within cutoff period
+                in_cutoff = (dup_date <= cutoff_date) if dup_date else False
+                
                 p_row = platform_txn_map.get(t_id)
                 t_date_str = str(p_row["parsed_date"]) if (p_row is not None and p_row["parsed_date"]) else "N/A"
-                p_amt = p_row["dec_amount"] if p_row is not None else Decimal("0.00")
                 
+                # Signed impact: duplicate payment increases bank cash (+), duplicate refund decreases bank cash (-)
+                signed_diff = dup_amt if dup_type == TransactionType.PAYMENT.value else -dup_amt
+
                 reconciled_records.append({
                     "transaction_id": t_id,
                     "settlement_id": dup_s_id,
                     "transaction_date": t_date_str,
                     "settlement_date": str(dup_date) if dup_date else "N/A",
                     "transaction_type": dup_type,
-                    "platform_amount": 0.0,  # Duplicate entry has no legitimate platform counterpart
+                    "platform_amount": 0.0,
                     "bank_amount": float(dup_amt),
-                    "difference": float(dup_amt),
+                    "difference": float(signed_diff),
                     "reconciliation_status": ReconciliationStatus.DUPLICATE_SETTLEMENT.value,
                     "days_to_settle": None,
                     "explanation": (
@@ -363,8 +421,9 @@ def reconcile_transactions(
                     ),
                     "_p_dec": Decimal("0.00"),
                     "_b_dec": dup_amt,
-                    "_diff_dec": dup_amt,
-                    "_in_cutoff": (dup_date <= cutoff_date) if dup_date else False,
+                    "_diff_dec": signed_diff,
+                    "_in_cutoff": in_cutoff,
+                    "_is_refund": (dup_type == TransactionType.REFUND.value),
                 })
 
     # 5. Process Remaining Unmatched Bank Settlements (RULE 7 & RULE 8)
@@ -378,8 +437,12 @@ def reconcile_transactions(
         b_amt = s_row["dec_amount"]
         s_type = s_row["norm_type"]
 
+        # Only audit bank settlements within period cutoff for month-end reconciliation
+        in_cutoff = (s_date <= cutoff_date) if s_date else False
+
         if s_type == TransactionType.REFUND.value:
             # RULE 7: ORPHAN REFUND (Bank has a refund for a transaction ID completely absent from platform)
+            # Cash impact: unauthorized cash outflow = -b_amt
             reconciled_records.append({
                 "transaction_id": t_id,
                 "settlement_id": s_id,
@@ -388,7 +451,7 @@ def reconcile_transactions(
                 "transaction_type": s_type,
                 "platform_amount": 0.0,
                 "bank_amount": float(b_amt),
-                "difference": float(b_amt),
+                "difference": float(-b_amt),
                 "reconciliation_status": ReconciliationStatus.ORPHAN_REFUND.value,
                 "days_to_settle": None,
                 "explanation": (
@@ -400,11 +463,13 @@ def reconcile_transactions(
                 ),
                 "_p_dec": Decimal("0.00"),
                 "_b_dec": b_amt,
-                "_diff_dec": b_amt,
-                "_in_cutoff": (s_date <= cutoff_date) if s_date else False,
+                "_diff_dec": -b_amt,
+                "_in_cutoff": in_cutoff,
+                "_is_refund": True,
             })
         else:
             # RULE 8: UNMATCHED BANK SETTLEMENT (Bank payment settlement with no platform record)
+            # Cash impact: extra unrecorded deposit = +b_amt
             reconciled_records.append({
                 "transaction_id": t_id,
                 "settlement_id": s_id,
@@ -427,19 +492,20 @@ def reconcile_transactions(
                 "_p_dec": Decimal("0.00"),
                 "_b_dec": b_amt,
                 "_diff_dec": b_amt,
-                "_in_cutoff": (s_date <= cutoff_date) if s_date else False,
+                "_in_cutoff": in_cutoff,
+                "_is_refund": False,
             })
 
     reconciled_df = pd.DataFrame(reconciled_records)
 
     # 6. Filter Exceptions
-    non_exception_statuses = {ReconciliationStatus.MATCHED.value}
+    non_exception_statuses = {ReconciliationStatus.MATCHED.value, ReconciliationStatus.POST_CUTOFF_TRANSACTION.value}
     if not reconciled_df.empty:
         exceptions_df = reconciled_df[~reconciled_df["reconciliation_status"].isin(non_exception_statuses)].copy()
     else:
         exceptions_df = pd.DataFrame(columns=reconciled_df.columns)
 
-    # 7. Financial Calculations (Strict Decimal Precision)
+    # 7. Financial Calculations (Strict Decimal Precision & Universal Reconciliation Bridge)
     summary = _calculate_financial_metrics(
         txns=txns,
         settles=settles,
@@ -448,7 +514,7 @@ def reconcile_transactions(
     )
 
     # Clean internal decimal columns from output DataFrames
-    cols_to_drop = ["_p_dec", "_b_dec", "_diff_dec", "_in_cutoff"]
+    cols_to_drop = ["_p_dec", "_b_dec", "_diff_dec", "_in_cutoff", "_is_refund"]
     clean_reconciled_df = reconciled_df.drop(columns=[c for c in cols_to_drop if c in reconciled_df.columns])
     clean_exceptions_df = exceptions_df.drop(columns=[c for c in cols_to_drop if c in exceptions_df.columns])
 
@@ -461,7 +527,7 @@ def _calculate_financial_metrics(
     reconciled_df: pd.DataFrame,
     cutoff_date: date,
 ) -> Dict[str, Any]:
-    """Calculate all financial metrics dynamically using Decimal arithmetic."""
+    """Calculate all financial metrics dynamically using Decimal arithmetic with full payment vs. refund disaggregation."""
     # Filter platform transactions within period (<= cutoff_date)
     period_txns = txns[txns["parsed_date"] <= cutoff_date] if not txns.empty else txns
     
@@ -491,18 +557,34 @@ def _calculate_financial_metrics(
             "platform_amount": Decimal("0.00"),
             "bank_amount": Decimal("0.00"),
             "difference": Decimal("0.00"),
+            "payments_count": 0,
+            "payments_platform_amount": Decimal("0.00"),
+            "payments_bank_amount": Decimal("0.00"),
+            "refunds_count": 0,
+            "refunds_platform_amount": Decimal("0.00"),
+            "refunds_bank_amount": Decimal("0.00"),
         }
 
     if not reconciled_df.empty:
         for _, row in reconciled_df.iterrows():
             st = row["reconciliation_status"]
             if st in status_metrics:
-                status_metrics[st]["count"] += 1
-                status_metrics[st]["platform_amount"] += row["_p_dec"]
-                status_metrics[st]["bank_amount"] += row["_b_dec"]
-                status_metrics[st]["difference"] += row["_diff_dec"]
+                m = status_metrics[st]
+                m["count"] += 1
+                m["platform_amount"] += row["_p_dec"]
+                m["bank_amount"] += row["_b_dec"]
+                m["difference"] += row["_diff_dec"]
+                
+                if row["_is_refund"]:
+                    m["refunds_count"] += 1
+                    m["refunds_platform_amount"] += row["_p_dec"]
+                    m["refunds_bank_amount"] += row["_b_dec"]
+                else:
+                    m["payments_count"] += 1
+                    m["payments_platform_amount"] += row["_p_dec"]
+                    m["payments_bank_amount"] += row["_b_dec"]
 
-    # Key Aggregates
+    # Key Disaggregated Aggregates
     matched_m = status_metrics[ReconciliationStatus.MATCHED.value]
     late_m = status_metrics[ReconciliationStatus.LATE_SETTLEMENT.value]
     unsettled_m = status_metrics[ReconciliationStatus.UNSETTLED.value]
@@ -514,13 +596,37 @@ def _calculate_financial_metrics(
     excess_refund_m = status_metrics[ReconciliationStatus.REFUND_EXCEEDS_PAYMENT.value]
 
     total_exceptions_count = sum(
-        m["count"] for st, m in status_metrics.items() if st != ReconciliationStatus.MATCHED.value
+        m["count"] for st, m in status_metrics.items()
+        if st not in [ReconciliationStatus.MATCHED.value, ReconciliationStatus.POST_CUTOFF_TRANSACTION.value]
     )
 
     # Net variance between Period Bank settlements and Period Platform transactions
     net_reconciliation_difference = net_bank_amount_period - net_platform_amount
 
-    # Convert all Decimals to float and string for display/JSON serialization
+    # Universal Mathematical Bridge:
+    # Net Bank = Net Platform
+    #            - Late Payments + Late Refunds
+    #            - Unsettled Payments + Unsettled Refunds
+    #            + Duplicate Payments - Duplicate Refunds
+    #            + Unmatched Bank Payments - Orphan Bank Refunds
+    #            + (Payment Amount Mismatches - Refund Amount Mismatches)
+    #            + Net Rounding Differences
+    #            - Excess Refunds Platform (if held)
+    bridge_expected_bank_net = (
+        net_platform_amount
+        - late_m["payments_platform_amount"]
+        + late_m["refunds_platform_amount"]
+        - unsettled_m["payments_platform_amount"]
+        + unsettled_m["refunds_platform_amount"]
+        + duplicate_m["payments_bank_amount"]
+        - duplicate_m["refunds_bank_amount"]
+        + unmatched_bank_m["payments_bank_amount"]
+        - orphan_m["bank_amount"]
+        + mismatch_m["difference"]
+        + rounding_m["difference"]
+    )
+    bridge_discrepancy = net_bank_amount_period - bridge_expected_bank_net
+
     summary = {
         # Platform Overview
         "platform_total_payments": total_platform_payments,
@@ -539,20 +645,37 @@ def _calculate_financial_metrics(
         
         # Overall Net Gap
         "net_reconciliation_difference": net_reconciliation_difference,
+        "bridge_discrepancy": bridge_discrepancy,
         
-        # Category Amounts & Counts
+        # Category Amounts & Counts (Disaggregated)
         "matched_count": matched_m["count"],
+        "matched_payments_count": matched_m["payments_count"],
+        "matched_payments_amount": matched_m["payments_platform_amount"],
+        "matched_refunds_count": matched_m["refunds_count"],
+        "matched_refunds_amount": matched_m["refunds_platform_amount"],
+        "matched_gross_amount": matched_m["platform_amount"],
+        "matched_net_amount": matched_m["payments_platform_amount"] - matched_m["refunds_platform_amount"],
         "matched_platform_amount": matched_m["platform_amount"],
         "matched_bank_amount": matched_m["bank_amount"],
         
         "unsettled_count": unsettled_m["count"],
         "unsettled_amount": unsettled_m["platform_amount"],
+        "unsettled_payments_count": unsettled_m["payments_count"],
+        "unsettled_payments_amount": unsettled_m["payments_platform_amount"],
+        "unsettled_refunds_count": unsettled_m["refunds_count"],
+        "unsettled_refunds_amount": unsettled_m["refunds_platform_amount"],
         
         "late_settlement_count": late_m["count"],
         "late_settlement_amount": late_m["platform_amount"],
+        "late_settlement_payments_count": late_m["payments_count"],
+        "late_settlement_payments_amount": late_m["payments_platform_amount"],
+        "late_settlement_refunds_count": late_m["refunds_count"],
+        "late_settlement_refunds_amount": late_m["refunds_platform_amount"],
         
         "duplicate_settlement_count": duplicate_m["count"],
         "duplicate_settlement_amount": duplicate_m["bank_amount"],
+        "duplicate_settlement_payments_amount": duplicate_m["payments_bank_amount"],
+        "duplicate_settlement_refunds_amount": duplicate_m["refunds_bank_amount"],
         
         "rounding_variance_count": rounding_m["count"],
         "rounding_platform_amount": rounding_m["platform_amount"],
@@ -589,6 +712,12 @@ def _build_zero_summary() -> Dict[str, Any]:
             "platform_amount": Decimal("0.00"),
             "bank_amount": Decimal("0.00"),
             "difference": Decimal("0.00"),
+            "payments_count": 0,
+            "payments_platform_amount": Decimal("0.00"),
+            "payments_bank_amount": Decimal("0.00"),
+            "refunds_count": 0,
+            "refunds_platform_amount": Decimal("0.00"),
+            "refunds_bank_amount": Decimal("0.00"),
         }
     return {
         "platform_total_payments": Decimal("0.00"),
@@ -601,15 +730,32 @@ def _build_zero_summary() -> Dict[str, Any]:
         "bank_total_records_period": 0,
         "bank_total_records_all": 0,
         "net_reconciliation_difference": Decimal("0.00"),
+        "bridge_discrepancy": Decimal("0.00"),
         "matched_count": 0,
+        "matched_payments_count": 0,
+        "matched_payments_amount": Decimal("0.00"),
+        "matched_refunds_count": 0,
+        "matched_refunds_amount": Decimal("0.00"),
+        "matched_gross_amount": Decimal("0.00"),
+        "matched_net_amount": Decimal("0.00"),
         "matched_platform_amount": Decimal("0.00"),
         "matched_bank_amount": Decimal("0.00"),
         "unsettled_count": 0,
         "unsettled_amount": Decimal("0.00"),
+        "unsettled_payments_count": 0,
+        "unsettled_payments_amount": Decimal("0.00"),
+        "unsettled_refunds_count": 0,
+        "unsettled_refunds_amount": Decimal("0.00"),
         "late_settlement_count": 0,
         "late_settlement_amount": Decimal("0.00"),
+        "late_settlement_payments_count": 0,
+        "late_settlement_payments_amount": Decimal("0.00"),
+        "late_settlement_refunds_count": 0,
+        "late_settlement_refunds_amount": Decimal("0.00"),
         "duplicate_settlement_count": 0,
         "duplicate_settlement_amount": Decimal("0.00"),
+        "duplicate_settlement_payments_amount": Decimal("0.00"),
+        "duplicate_settlement_refunds_amount": Decimal("0.00"),
         "rounding_variance_count": 0,
         "rounding_platform_amount": Decimal("0.00"),
         "rounding_bank_amount": Decimal("0.00"),

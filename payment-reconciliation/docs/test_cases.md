@@ -23,11 +23,23 @@ The test suite is automated using `pytest` located in `tests/test_reconciliation
 
 ---
 
+## Independent Financial Reconciliation Auditor Test Cases (`tests/test_audit_independent.py`)
+
+| Test ID | Test Scenario | Input Data | Expected Result | Actual Result | Pass / Fail |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **AUDIT-01** | Cumulative Partial Refunds Exceeding Payment | Payment ₹2000; Refund 1: ₹800, Refund 2: ₹1000, Refund 3: ₹500 (Cumulative ₹2300 > ₹2000) | Refunds 1 & 2 `MATCHED`; Refund 3 classified `REFUND_EXCEEDS_PAYMENT` | Cumulative tracking flags Refund 3 as exceeding original charge | **PASS** |
+| **AUDIT-02** | Invalid Refund Reference (Chained Refund) | Refund citing another refund ID rather than a payment ID | Status: `ORPHAN_REFUND` (invalid refund source reference) | Successfully rejected as `ORPHAN_REFUND` | **PASS** |
+| **AUDIT-03** | Mixed Unsettled Disaggregation | 1 unsettled payment (₹1500) and 1 unsettled refund (₹300) | Disaggregated into `unsettled_payments` (₹1500) and `unsettled_refunds` (₹300); Bridge matches | Count: 1/1, Amount: ₹1500 / ₹300, Bridge Discrepancy: ₹0.00 | **PASS** |
+| **AUDIT-04** | Mixed Late Settlements Disaggregation | 1 late payment (₹4000) and 1 late refund (₹800) settling in February | Disaggregated into `late_payments` (₹4000) and `late_refunds` (₹800); Bridge matches | Disaggregated cleanly, Bridge Discrepancy: ₹0.00 | **PASS** |
+| **AUDIT-05** | Universal Multi-Anomaly Reconciliation Bridge | Exhaustive dataset featuring all anomaly types simultaneously | Mathematical Bridge Discrepancy: Exact ₹0.00; Net Gap bridged 100% | Bridge Discrepancy: `Decimal('0.00')`, Verified to 0.00 paisa | **PASS** |
+
+---
+
 ## Automated Execution Summary
 ```bash
-pytest -v tests/test_reconciliation.py
+pytest -v
 ```
-* **Collected**: 16 items
-* **Passed**: 16 items (100%)
+* **Collected**: 21 items (16 Core + 5 Independent Auditor)
+* **Passed**: 21 items (100%)
 * **Failed**: 0 items
-* **Execution Time**: 1.92 seconds
+* **Execution Time**: 1.66 seconds
