@@ -1,7 +1,7 @@
 """PAYMENT RECONCILIATION: Transaction & Bank Settlement Intelligence.
 
-Production-grade Streamlit Financial Dashboard for Reconciliation, Anomaly Detection,
-and Financial Gap Auditing.
+Production-grade Fintech Streamlit Dashboard for Payment Reconciliation,
+Discrepancy Investigation, and Ledger Gap Auditing.
 """
 
 import io
@@ -30,118 +30,246 @@ from data_generator import generate_synthetic_datasets
 # Page Configuration
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Payment Reconciliation & Gap Detection",
+    page_title="Payment Reconciliation & Gap Detection | Fintech Ledger",
     page_icon="⚖️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 # -----------------------------------------------------------------------------
-# Custom Styling: Modern, Clean Light Theme with Dark Navy Typography
+# Custom Styling: Modern High-End Fintech UI (Inter / Slate / Deep Navy)
 # -----------------------------------------------------------------------------
 st.markdown(
     """
     <style>
-    /* Global Styles */
-    .stApp {
+    /* Global Typography & Font Family */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    
+    html, body, [class*="css"], .stApp {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
         background-color: #F8FAFC;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         color: #0F172A;
     }
     
-    /* Headers */
-    h1, h2, h3, h4 {
+    /* Headers & Branding */
+    h1, h2, h3, h4, h5 {
         color: #0F172A !important;
         font-weight: 700 !important;
-        letter-spacing: -0.02em;
+        letter-spacing: -0.025em;
+    }
+    
+    .brand-container {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #E2E8F0;
+        margin-bottom: 16px;
     }
     
     .brand-title {
-        font-size: 2.1rem;
+        font-size: 1.85rem;
         font-weight: 800;
         color: #0F172A;
-        margin-bottom: 0px;
+        letter-spacing: -0.03em;
         line-height: 1.15;
-    }
-    .brand-accent {
-        color: #1E3A8A;
-    }
-    .brand-subtitle {
-        font-size: 1.0rem;
-        color: #475569;
-        margin-top: 4px;
-        margin-bottom: 24px;
+        margin: 0;
     }
     
+    .brand-accent {
+        color: #2563EB;
+    }
+    
+    .brand-subtitle {
+        font-size: 0.92rem;
+        color: #64748B;
+        font-weight: 400;
+        margin-top: 4px;
+        margin-bottom: 0px;
+    }
+    
+    .badge-live {
+        background-color: #ECFDF5;
+        color: #059669;
+        border: 1px solid #A7F3D0;
+        padding: 4px 10px;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .badge-live-dot {
+        width: 7px;
+        height: 7px;
+        background-color: #059669;
+        border-radius: 50%;
+    }
+
     /* KPI Metric Cards */
     .metric-card {
-        background-color: #FFFFFF;
+        background: #FFFFFF;
         border: 1px solid #E2E8F0;
-        border-radius: 10px;
+        border-radius: 12px;
         padding: 18px 20px;
-        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
-        margin-bottom: 12px;
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02);
+        transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+        position: relative;
+        overflow: hidden;
+        min-height: 128px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
     }
     .metric-card:hover {
-        box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.1);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px -2px rgba(15, 23, 42, 0.08);
         border-color: #CBD5E1;
     }
-    .metric-label {
-        font-size: 0.80rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: #64748B;
+    .metric-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: transparent;
+    }
+    .metric-card.border-matched::before { background: #059669; }
+    .metric-card.border-unsettled::before { background: #D97706; }
+    .metric-card.border-gap::before { background: #DC2626; }
+    .metric-card.border-exceptions::before { background: #4F46E5; }
+    .metric-card.border-primary::before { background: #2563EB; }
+    
+    .metric-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
         margin-bottom: 6px;
     }
+    .metric-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #64748B;
+    }
+    .metric-icon {
+        font-size: 1.05rem;
+        color: #94A3B8;
+    }
     .metric-value {
-        font-size: 1.65rem;
+        font-size: 1.70rem;
         font-weight: 700;
         color: #0F172A;
+        letter-spacing: -0.03em;
         line-height: 1.2;
+        font-variant-numeric: tabular-nums;
     }
-    .metric-sub {
+    .metric-footer {
+        display: flex;
+        align-items: center;
+        gap: 6px;
         font-size: 0.78rem;
         color: #64748B;
-        margin-top: 4px;
+        margin-top: 6px;
+    }
+    .metric-pill {
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.72rem;
+    }
+    .pill-green { background: #ECFDF5; color: #047857; }
+    .pill-amber { background: #FFFBEB; color: #B45309; }
+    .pill-red { background: #FEF2F2; color: #B91C1C; }
+    .pill-blue { background: #EFF6FF; color: #1D4ED8; }
+    
+    /* Anomaly Banner Cards */
+    .anomaly-card {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 10px;
+        padding: 16px 18px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+        transition: all 0.15s ease;
+        border-left: 4px solid #CBD5E1;
+    }
+    .anomaly-card:hover {
+        border-color: #94A3B8;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.06);
+    }
+    
+    /* Forensic Investigation Card */
+    .dossier-card {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 12px;
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+        padding: 24px;
+        margin-top: 10px;
+    }
+    .dossier-panel {
+        background: #F8FAFC;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        padding: 16px;
+    }
+    .dossier-field {
+        margin-bottom: 10px;
+    }
+    .dossier-field:last-child {
+        margin-bottom: 0px;
+    }
+    .dossier-field-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #64748B;
+    }
+    .dossier-field-value {
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: #0F172A;
     }
     
     /* Status Pills */
     .status-pill {
         display: inline-block;
-        padding: 3px 10px;
+        padding: 3px 12px;
         font-size: 0.75rem;
         font-weight: 600;
         border-radius: 9999px;
         text-align: center;
+        letter-spacing: 0.02em;
     }
     
-    /* Exception Card */
-    .investigation-card {
-        background-color: #FFFFFF;
-        border: 1px solid #E2E8F0;
-        border-left: 5px solid #1E3A8A;
-        border-radius: 8px;
-        padding: 22px;
-        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
-        margin-top: 10px;
+    /* Tabs styling overrides */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        border-bottom: 1px solid #E2E8F0;
+        padding-bottom: 4px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        font-weight: 600 !important;
+        font-size: 0.90rem !important;
+        border-radius: 6px !important;
+        padding: 8px 16px !important;
+        background-color: transparent !important;
+        color: #64748B !important;
+    }
+    .stTabs [aria-selected="true"] {
+        color: #1E3A8A !important;
+        background-color: #EFF6FF !important;
     }
     
-    /* Section Container */
-    .section-box {
-        background-color: #FFFFFF;
-        border: 1px solid #E2E8F0;
-        border-radius: 10px;
-        padding: 24px;
-        margin-bottom: 24px;
-        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
-    }
-    
-    /* Sidebar enhancements */
+    /* Sidebar polish */
     [data-testid="stSidebar"] {
-        background-color: #FFFFFF;
-        border-right: 1px solid #E2E8F0;
+        background-color: #FFFFFF !important;
+        border-right: 1px solid #E2E8F0 !important;
     }
     </style>
     """,
@@ -181,15 +309,15 @@ if "tolerance" not in st.session_state:
 
 
 # -----------------------------------------------------------------------------
-# SIDEBAR
+# SIDEBAR CONTROLS
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.markdown("### ⚖️ **Reconciliation Control**")
-    st.caption("Financial Ledger & Bank Auditing")
+    st.caption("Financial Ledger & Bank Auditing Engine")
     st.divider()
 
     # Section Navigation
-    st.markdown("**Navigation**")
+    st.markdown("**Navigation Views**")
     nav_selection = st.radio(
         "Go to Section",
         [
@@ -204,33 +332,33 @@ with st.sidebar:
     )
 
     st.divider()
-    st.markdown("**Period & Tolerance Settings**")
+    st.markdown("**Audit Parameters**")
     
     # Month selector & Cutoff Date
-    selected_month = st.selectbox("Reconciliation Month", ["January 2026", "Custom Period"], index=0)
-    if selected_month == "January 2026":
-        selected_cutoff = st.date_input("Month-End Cutoff Date", value=DEFAULT_CUTOFF_DATE)
+    selected_month = st.selectbox("Accounting Period", ["January 2026 (Month-End)", "Custom Period"], index=0)
+    if selected_month.startswith("January 2026"):
+        selected_cutoff = st.date_input("Cutoff Boundary Date", value=DEFAULT_CUTOFF_DATE)
     else:
-        selected_cutoff = st.date_input("Month-End Cutoff Date", value=st.session_state["cutoff_date"])
+        selected_cutoff = st.date_input("Cutoff Boundary Date", value=st.session_state["cutoff_date"])
     
     st.session_state["cutoff_date"] = selected_cutoff
 
     tolerance_val = st.number_input(
-        "Rounding Tolerance (₹)",
+        "Rounding Variance Tolerance (₹)",
         min_value=0.00,
         max_value=1.00,
         value=float(DEFAULT_ROUNDING_TOLERANCE),
         step=0.01,
-        help="Differences within this threshold are classified as Rounding Variance rather than Amount Mismatch.",
+        help="Differences within this threshold are routed to Rounding Variance rather than marked as Amount Mismatches.",
     )
     st.session_state["tolerance"] = to_decimal(tolerance_val)
 
     st.divider()
     st.markdown("**Data Ingestion**")
-    use_sample = st.checkbox("Use Sample Synthetic Dataset", value=True, help="Loads pre-seeded deterministic dataset with all 4 anomalies.")
+    use_sample = st.checkbox("Use Seeded Sample Dataset (Deterministic)", value=True, help="Loads pre-seeded dataset with all 4 isolated anomalies.")
 
-    uploaded_tx = st.file_uploader("Upload Platform Transactions (CSV)", type=["csv"])
-    uploaded_se = st.file_uploader("Upload Bank Settlements (CSV)", type=["csv"])
+    uploaded_tx = st.file_uploader("Upload Transactions CSV", type=["csv"])
+    uploaded_se = st.file_uploader("Upload Settlements CSV", type=["csv"])
 
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
@@ -286,7 +414,7 @@ with st.sidebar:
 
 
 # -----------------------------------------------------------------------------
-# RUN RECONCILIATION
+# RUN RECONCILIATION ENGINE
 # -----------------------------------------------------------------------------
 current_tx = st.session_state["transactions_df"]
 current_se = st.session_state["settlements_df"]
@@ -304,19 +432,31 @@ reconciled_df, exceptions_df, summary, validation_report = reconcile_transaction
 # -----------------------------------------------------------------------------
 # APPLICATION HEADER
 # -----------------------------------------------------------------------------
-st.markdown('<div class="brand-title">PAYMENT RECONCILIATION <span class="brand-accent">&bull;</span> Transaction & Bank Settlement Intelligence</div>', unsafe_allow_html=True)
-st.markdown('<div class="brand-subtitle">Identify discrepancies. Track settlements. Understand every financial gap.</div>', unsafe_allow_html=True)
+st.markdown(
+    f"""
+    <div class="brand-container">
+        <div>
+            <div class="brand-title">PAYMENT RECONCILIATION <span class="brand-accent">&bull;</span> Transaction & Bank Settlement Intelligence</div>
+            <div class="brand-subtitle">Automated ledger comparison &bull; Gap detection &bull; Exact Decimal reconciliation</div>
+        </div>
+        <div>
+            <span class="badge-live">
+                <span class="badge-live-dot"></span> Audit Active &bull; Cutoff: {current_cutoff}
+            </span>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
-# Data source pill & period indicator
-col_hdr1, col_hdr2, col_hdr3 = st.columns([2, 1, 1])
-with col_hdr1:
-    st.info(f"📁 Active Source: **{st.session_state['data_source']}**", icon="ℹ️")
-with col_hdr2:
-    st.markdown(f"**Reconciliation Cutoff:** `{current_cutoff}`")
-with col_hdr3:
-    st.markdown(f"**Rounding Tolerance:** `₹{float(current_tolerance):.2f}`")
-
-st.markdown("<br>", unsafe_allow_html=True)
+# Active Context Breadcrumb
+crumb_col1, crumb_col2, crumb_col3 = st.columns([2, 1, 1])
+with crumb_col1:
+    st.caption(f"📂 **Active Dataset:** {st.session_state['data_source']}")
+with crumb_col2:
+    st.caption(f"🎯 **Cutoff Boundary:** `{current_cutoff}`")
+with crumb_col3:
+    st.caption(f"⚙️ **Variance Tolerance:** `₹{float(current_tolerance):.2f}`")
 
 
 # -----------------------------------------------------------------------------
@@ -330,10 +470,15 @@ if nav_selection in ["1. Overview & KPIs"]:
     with kpi1:
         st.markdown(
             f"""
-            <div class="metric-card">
-                <div class="metric-label">Platform Volume</div>
+            <div class="metric-card border-primary">
+                <div class="metric-header">
+                    <span class="metric-label">Platform Volume</span>
+                    <span class="metric-icon">💳</span>
+                </div>
                 <div class="metric-value">{summary['platform_total_records']}</div>
-                <div class="metric-sub">Net: {format_inr(summary['platform_net_amount'])}</div>
+                <div class="metric-footer">
+                    <span class="metric-pill pill-blue">Net: {format_inr(summary['platform_net_amount'])}</span>
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -342,10 +487,15 @@ if nav_selection in ["1. Overview & KPIs"]:
     with kpi2:
         st.markdown(
             f"""
-            <div class="metric-card">
-                <div class="metric-label">Bank Settlements</div>
+            <div class="metric-card border-primary">
+                <div class="metric-header">
+                    <span class="metric-label">Bank Settlements</span>
+                    <span class="metric-icon">🏦</span>
+                </div>
                 <div class="metric-value">{summary['bank_total_records_period']}</div>
-                <div class="metric-sub">Net: {format_inr(summary['bank_net_amount_period'])}</div>
+                <div class="metric-footer">
+                    <span class="metric-pill pill-blue">Net: {format_inr(summary['bank_net_amount_period'])}</span>
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -354,10 +504,15 @@ if nav_selection in ["1. Overview & KPIs"]:
     with kpi3:
         st.markdown(
             f"""
-            <div class="metric-card">
-                <div class="metric-label">Fully Matched</div>
+            <div class="metric-card border-matched">
+                <div class="metric-header">
+                    <span class="metric-label">Fully Matched</span>
+                    <span class="metric-icon" style="color: #059669;">✓</span>
+                </div>
                 <div class="metric-value" style="color: #059669;">{summary['matched_count']}</div>
-                <div class="metric-sub">Gross: {format_inr(summary['matched_gross_amount'])} | Net: {format_inr(summary['matched_net_amount'])}</div>
+                <div class="metric-footer">
+                    <span class="metric-pill pill-green">Gross: {format_inr(summary['matched_gross_amount'])}</span>
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -366,10 +521,15 @@ if nav_selection in ["1. Overview & KPIs"]:
     with kpi4:
         st.markdown(
             f"""
-            <div class="metric-card">
-                <div class="metric-label">Unsettled In-Transit</div>
+            <div class="metric-card border-unsettled">
+                <div class="metric-header">
+                    <span class="metric-label">Unsettled In-Transit</span>
+                    <span class="metric-icon" style="color: #D97706;">⏳</span>
+                </div>
                 <div class="metric-value" style="color: #D97706;">{summary['unsettled_count']}</div>
-                <div class="metric-sub">{format_inr(summary['unsettled_amount'])} awaiting bank</div>
+                <div class="metric-footer">
+                    <span class="metric-pill pill-amber">{format_inr(summary['unsettled_amount'])} awaiting bank</span>
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -378,12 +538,19 @@ if nav_selection in ["1. Overview & KPIs"]:
     with kpi5:
         net_gap = summary["net_reconciliation_difference"]
         gap_color = "#DC2626" if net_gap != 0 else "#059669"
+        border_cls = "border-gap" if net_gap != 0 else "border-matched"
+        pill_cls = "pill-red" if net_gap != 0 else "pill-green"
         st.markdown(
             f"""
-            <div class="metric-card">
-                <div class="metric-label">Reconciliation Gap</div>
+            <div class="metric-card {border_cls}">
+                <div class="metric-header">
+                    <span class="metric-label">Reconciliation Gap</span>
+                    <span class="metric-icon" style="color: {gap_color};">⚖️</span>
+                </div>
                 <div class="metric-value" style="color: {gap_color};">{format_inr(net_gap)}</div>
-                <div class="metric-sub">Net Bank vs Net Platform</div>
+                <div class="metric-footer">
+                    <span class="metric-pill {pill_cls}">Net Bank vs. Platform</span>
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -392,10 +559,15 @@ if nav_selection in ["1. Overview & KPIs"]:
     with kpi6:
         st.markdown(
             f"""
-            <div class="metric-card">
-                <div class="metric-label">Total Exceptions</div>
+            <div class="metric-card border-exceptions">
+                <div class="metric-header">
+                    <span class="metric-label">Total Exceptions</span>
+                    <span class="metric-icon" style="color: #4F46E5;">⚠️</span>
+                </div>
                 <div class="metric-value" style="color: #4F46E5;">{summary['total_exceptions_count']}</div>
-                <div class="metric-sub">Items requiring audit</div>
+                <div class="metric-footer">
+                    <span class="metric-pill pill-amber">Requires Audit / Follow-up</span>
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -410,11 +582,20 @@ if nav_selection in ["1. Overview & KPIs"]:
     with anom1:
         st.markdown(
             f"""
-            <div style="background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 8px; padding: 14px;">
-                <b style="color: #92400E;">1. Late Settlement</b><br>
-                <span style="font-size: 1.3rem; font-weight: 700; color: #B45309;">{summary['late_settlement_count']} Detected</span><br>
-                <span style="font-size: 0.85rem; color: #78350F;">Impact: {format_inr(summary['late_settlement_amount'])}</span><br>
-                <span style="font-size: 0.75rem; color: #451A03;">Jan 31 txn settled on Feb 1</span>
+            <div class="anomaly-card" style="border-left-color: #D97706; background: #FFFDF5;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <b style="color: #92400E; font-size: 0.88rem;">1. Late Settlement</b>
+                    <span class="metric-pill pill-amber">Timing</span>
+                </div>
+                <div style="font-size: 1.45rem; font-weight: 700; color: #B45309; line-height: 1.2;">
+                    {summary['late_settlement_count']} Detected
+                </div>
+                <div style="font-size: 0.82rem; color: #78350F; font-weight: 500; margin-top: 4px;">
+                    Impact: <b>{format_inr(summary['late_settlement_amount'])}</b>
+                </div>
+                <div style="font-size: 0.74rem; color: #92400E; margin-top: 4px;">
+                    Jan 31 txn settled Feb 1 &bull; Rolls to Feb balance
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -423,11 +604,20 @@ if nav_selection in ["1. Overview & KPIs"]:
     with anom2:
         st.markdown(
             f"""
-            <div style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; padding: 14px;">
-                <b style="color: #1E40AF;">2. Rounding Variance</b><br>
-                <span style="font-size: 1.3rem; font-weight: 700; color: #1D4ED8;">{summary['rounding_variance_count']} Detected</span><br>
-                <span style="font-size: 0.85rem; color: #1E3A8A;">Net Diff: {format_inr(summary['rounding_total_difference'])}</span><br>
-                <span style="font-size: 0.75rem; color: #172554;">Cumulative decimal variance</span>
+            <div class="anomaly-card" style="border-left-color: #2563EB; background: #F8FAFF;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <b style="color: #1E40AF; font-size: 0.88rem;">2. Rounding Variance</b>
+                    <span class="metric-pill pill-blue">Decimal FX</span>
+                </div>
+                <div style="font-size: 1.45rem; font-weight: 700; color: #1D4ED8; line-height: 1.2;">
+                    {summary['rounding_variance_count']} Detected
+                </div>
+                <div style="font-size: 0.82rem; color: #1E3A8A; font-weight: 500; margin-top: 4px;">
+                    Net Diff: <b>{format_inr(summary['rounding_total_difference'])}</b>
+                </div>
+                <div style="font-size: 0.74rem; color: #1E40AF; margin-top: 4px;">
+                    Cumulative decimal diffs within ₹0.05 tolerance
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -436,11 +626,20 @@ if nav_selection in ["1. Overview & KPIs"]:
     with anom3:
         st.markdown(
             f"""
-            <div style="background: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px; padding: 14px;">
-                <b style="color: #991B1B;">3. Duplicate Settlement</b><br>
-                <span style="font-size: 1.3rem; font-weight: 700; color: #B91C1C;">{summary['duplicate_settlement_count']} Detected</span><br>
-                <span style="font-size: 0.85rem; color: #7F1D1D;">Impact: {format_inr(summary['duplicate_settlement_amount'])}</span><br>
-                <span style="font-size: 0.75rem; color: #450A0A;">Repeated bank credit entries</span>
+            <div class="anomaly-card" style="border-left-color: #DC2626; background: #FFF8F8;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <b style="color: #991B1B; font-size: 0.88rem;">3. Duplicate Settlement</b>
+                    <span class="metric-pill pill-red">Quarantine</span>
+                </div>
+                <div style="font-size: 1.45rem; font-weight: 700; color: #B91C1C; line-height: 1.2;">
+                    {summary['duplicate_settlement_count']} Detected
+                </div>
+                <div style="font-size: 0.82rem; color: #7F1D1D; font-weight: 500; margin-top: 4px;">
+                    Impact: <b>{format_inr(summary['duplicate_settlement_amount'])}</b>
+                </div>
+                <div style="font-size: 0.74rem; color: #991B1B; margin-top: 4px;">
+                    Repeated credit isolated; revenue protected
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -449,11 +648,20 @@ if nav_selection in ["1. Overview & KPIs"]:
     with anom4:
         st.markdown(
             f"""
-            <div style="background: #FAF5FF; border: 1px solid #E9D5FF; border-radius: 8px; padding: 14px;">
-                <b style="color: #6B21A8;">4. Orphan Refund</b><br>
-                <span style="font-size: 1.3rem; font-weight: 700; color: #7E22CE;">{summary['orphan_refund_count']} Detected</span><br>
-                <span style="font-size: 0.85rem; color: #581C87;">Impact: {format_inr(summary['orphan_refund_amount'])}</span><br>
-                <span style="font-size: 0.75rem; color: #3B0764;">Refund without origin payment</span>
+            <div class="anomaly-card" style="border-left-color: #7C3AED; background: #FCF8FF;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <b style="color: #6B21A8; font-size: 0.88rem;">4. Orphan Refund</b>
+                    <span class="metric-pill" style="background:#F3E8FF; color:#6B21A8;">Audit</span>
+                </div>
+                <div style="font-size: 1.45rem; font-weight: 700; color: #7E22CE; line-height: 1.2;">
+                    {summary['orphan_refund_count']} Detected
+                </div>
+                <div style="font-size: 0.82rem; color: #581C87; font-weight: 500; margin-top: 4px;">
+                    Impact: <b>{format_inr(summary['orphan_refund_amount'])}</b>
+                </div>
+                <div style="font-size: 0.74rem; color: #6B21A8; margin-top: 4px;">
+                    Bank debit lacking source payment &bull; Fraud alert
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -466,59 +674,76 @@ if nav_selection in ["1. Overview & KPIs"]:
 if nav_selection in ["1. Overview & KPIs", "2. Financial Reconciliation"]:
     st.divider()
     st.subheader("2. Financial Reconciliation Ledger")
-    st.caption("Detailed reconciliation of Gross Payments, Refunds, and Net Settled Funds against Month-End Balances.")
+    st.caption("Detailed ledger audit reconciling Gross Payments, Refunds, and Net Settled Funds with Month-End Balances.")
 
-    tab_gross, tab_refund, tab_net = st.tabs(["Gross Payments", "Refunds", "Net Reconciliation Bridge"])
+    tab_gross, tab_refund, tab_net = st.tabs(["📊 Gross Payments Ledger", "🔄 Refunds & Contra-Revenue", "🌉 Net Reconciliation Bridge"])
 
     with tab_gross:
         g1, g2, g3 = st.columns(3)
         with g1:
-            st.metric("Platform Gross Payments", format_inr(summary["platform_total_payments"]))
+            st.metric("Platform Expected Gross Payments", format_inr(summary["platform_total_payments"]))
         with g2:
-            st.metric("Bank Gross Payments (In-Period)", format_inr(summary["bank_total_payments_period"]))
+            st.metric("Bank Gross Payments (Cleared In-Period)", format_inr(summary["bank_total_payments_period"]))
         with g3:
             gross_diff = summary["bank_total_payments_period"] - summary["platform_total_payments"]
             st.metric("Gross Payment Difference", format_inr(gross_diff), delta=float(gross_diff))
 
-        st.markdown(
-            f"""
-            **Gross Payment Reconciliation Breakdown:**
-            - **Platform Expected Payments:** `{format_inr(summary['platform_total_payments'])}`
-            - **Less In-Transit / Unsettled Payments:** `- {format_inr(summary['unsettled_payments_amount'])}`
-            - **Less Late Settlements (Settling post-cutoff in Feb):** `- {format_inr(summary['late_settlement_payments_amount'])}`
-            - **Add Duplicate Payment Settlements from Bank:** `+ {format_inr(summary['duplicate_settlement_payments_amount'])}`
-            - **Add Unmatched External Bank Credits:** `+ {format_inr(summary['unmatched_bank_amount'])}`
-            - **Net Rounding & Amount Discrepancies:** `{format_inr(summary['rounding_total_difference'] + summary['amount_mismatch_difference'])}`
-            - **= Realized Bank Gross Payments:** `{format_inr(summary['bank_total_payments_period'])}`
-            """
-        )
+        col_tbl, col_notes = st.columns([1.4, 1])
+        with col_tbl:
+            gross_ledger_data = [
+                {"Reconciliation Line Item": "Platform Expected Gross Payments", "Impact": format_inr(summary["platform_total_payments"]), "Direction": "Base"},
+                {"Reconciliation Line Item": "Less: In-Transit / Unsettled Payments", "Impact": f"- {format_inr(summary['unsettled_payments_amount'])}", "Direction": "Deduction"},
+                {"Reconciliation Line Item": "Less: Late Settlements (Settling in February)", "Impact": f"- {format_inr(summary['late_settlement_payments_amount'])}", "Direction": "Timing"},
+                {"Reconciliation Line Item": "Add: Duplicate Payment Credits from Bank", "Impact": f"+ {format_inr(summary['duplicate_settlement_payments_amount'])}", "Direction": "Quarantine"},
+                {"Reconciliation Line Item": "Add: Unmatched External Bank Credits", "Impact": f"+ {format_inr(summary['unmatched_bank_amount'])}", "Direction": "Unrecorded"},
+                {"Reconciliation Line Item": "Net Rounding & Amount Discrepancies", "Impact": format_inr(summary["rounding_total_difference"] + summary["amount_mismatch_difference"]), "Direction": "Variance"},
+                {"Reconciliation Line Item": "Realized Bank Gross Payments (Period)", "Impact": format_inr(summary["bank_total_payments_period"]), "Direction": "Reconciled"},
+            ]
+            st.dataframe(pd.DataFrame(gross_ledger_data), use_container_width=True, hide_index=True)
+
+        with col_notes:
+            st.info(
+                f"""
+                **Auditor Ledger Notes:**
+                - **Cleared Payments:** `{format_inr(summary['matched_payments_amount'])}` across {summary['matched_payments_count']} payments fully verified.
+                - **Timing Deferrals:** `{format_inr(summary['late_settlement_payments_amount'])}` transacted on Jan 31 rolling into February settlement clearing.
+                - **Cash Protection:** `{format_inr(summary['duplicate_settlement_payments_amount'])}` duplicate credit quarantined from P&L revenue.
+                """,
+                icon="💡",
+            )
 
     with tab_refund:
         r1, r2, r3 = st.columns(3)
         with r1:
-            st.metric("Platform Recorded Refunds", format_inr(summary["platform_total_refunds"]))
+            st.metric("Platform Expected Refunds", format_inr(summary["platform_total_refunds"]))
         with r2:
             st.metric("Bank Processed Refunds (In-Period)", format_inr(summary["bank_total_refunds_period"]))
         with r3:
             refund_diff = summary["bank_total_refunds_period"] - summary["platform_total_refunds"]
-            st.metric("Refund Variance", format_inr(refund_diff), delta=float(refund_diff))
+            st.metric("Refund Net Variance", format_inr(refund_diff), delta=float(refund_diff))
 
-        st.markdown(
-            f"""
-            **Refund Verification Notes & Ledger Bridge:**
-            - **Platform Expected Refunds:** `{format_inr(summary['platform_total_refunds'])}`
-            - **Less In-Transit / Unsettled Refunds:** `- {format_inr(summary['unsettled_refunds_amount'])}`
-            - **Less Late Settlement Refunds:** `- {format_inr(summary['late_settlement_refunds_amount'])}`
-            - **Add Orphan Bank Refunds (Unbacked Debits):** `+ {format_inr(summary['orphan_refund_amount'])}`
-            - **Add Duplicate Bank Refund Debits:** `+ {format_inr(summary['duplicate_settlement_refunds_amount'])}`
-            - **= Realized Bank Processed Refunds:** `{format_inr(summary['bank_total_refunds_period'])}`
-            
-            *Audit Observations:*
-            - All platform refunds are cross-referenced with original payment transactions.
-            - Detected **{summary['orphan_refund_count']} orphan refund(s)** totaling `{format_inr(summary['orphan_refund_amount'])}` settled at the bank without a valid source transaction.
-            - Detected **{summary['refund_exceeds_payment_count']} refund(s)** where refund amount exceeded original transaction payment.
-            """
-        )
+        col_ref_tbl, col_ref_notes = st.columns([1.4, 1])
+        with col_ref_tbl:
+            refund_ledger_data = [
+                {"Refund Line Item": "Platform Expected Refunds (Contra-Revenue)", "Amount": format_inr(summary["platform_total_refunds"]), "Status": "Expected"},
+                {"Refund Line Item": "Less: Unsettled Platform Refunds", "Amount": f"- {format_inr(summary['unsettled_refunds_amount'])}", "Status": "In-Transit"},
+                {"Refund Line Item": "Less: Late Settlement Refunds (Feb Settlement)", "Amount": f"- {format_inr(summary['late_settlement_refunds_amount'])}", "Status": "Timing"},
+                {"Refund Line Item": "Add: Orphan Bank Refunds (No Source Payment)", "Amount": f"+ {format_inr(summary['orphan_refund_amount'])}", "Status": "Anomaly"},
+                {"Refund Line Item": "Add: Duplicate Bank Refund Debits", "Amount": f"+ {format_inr(summary['duplicate_settlement_refunds_amount'])}", "Status": "Anomaly"},
+                {"Refund Line Item": "Realized Bank Processed Refunds", "Amount": format_inr(summary["bank_total_refunds_period"]), "Status": "Reconciled"},
+            ]
+            st.dataframe(pd.DataFrame(refund_ledger_data), use_container_width=True, hide_index=True)
+
+        with col_ref_notes:
+            st.warning(
+                f"""
+                **Refund Governance Observations:**
+                - Verified **{summary['matched_refunds_count']} valid refunds** totaling `{format_inr(summary['matched_refunds_amount'])}` matched to original charges.
+                - Flagged **{summary['orphan_refund_count']} orphan refund(s)** totaling `{format_inr(summary['orphan_refund_amount'])}` lacking parent transactions.
+                - Flagged **{summary['refund_exceeds_payment_count']} refund(s)** exceeding original payment authorization.
+                """,
+                icon="⚠️",
+            )
 
     with tab_net:
         n1, n2, n3 = st.columns(3)
@@ -576,22 +801,32 @@ if nav_selection in ["1. Overview & KPIs", "2. Financial Reconciliation"]:
                 measure=["absolute", "relative", "relative", "relative", "relative", "relative", "relative", "relative", "relative", "relative", "total"],
                 x=waterfall_x,
                 y=waterfall_y,
-                connector={"line": {"color": "#94A3B8"}},
+                textposition="outside",
+                text=[f"₹{abs(v):,.0f}" if v != 0 else "" for v in waterfall_y[:-1]] + [f"₹{float(summary['bank_net_amount_period']):,.0f}"],
+                connector={"line": {"color": "#94A3B8", "width": 1.5}},
                 decreasing={"marker": {"color": "#DC2626"}},
                 increasing={"marker": {"color": "#059669"}},
                 totals={"marker": {"color": "#1E3A8A"}},
             )
         )
         fig_waterfall.update_layout(
-            title="Net Financial Reconciliation Bridge (Platform to Bank)",
+            title=dict(
+                text="<b>Net Financial Reconciliation Bridge (Platform to Bank)</b>",
+                font=dict(size=15, color="#0F172A"),
+            ),
             plot_bgcolor="#FFFFFF",
             paper_bgcolor="#FFFFFF",
             height=430,
-            margin=dict(l=20, r=20, t=40, b=20),
-            yaxis_title="Amount (₹)",
+            margin=dict(l=20, r=20, t=50, b=20),
+            yaxis=dict(
+                title="Monetary Value (₹)",
+                gridcolor="#F1F5F9",
+                zerolinecolor="#CBD5E1",
+            ),
+            xaxis=dict(tickangle=-25),
         )
         st.plotly_chart(fig_waterfall, use_container_width=True)
-        st.caption(f"✅ Verified Mathematical Bridge Discrepancy: **{format_inr(summary['bridge_discrepancy'])}** (Exact 0.00)")
+        st.success(f"✅ **Mathematical Bridge Status:** Verified to **`{format_inr(summary['bridge_discrepancy'])}`** discrepancy (Exact 0.00). Ledger fully balanced.")
 
 
 # -----------------------------------------------------------------------------
@@ -599,25 +834,23 @@ if nav_selection in ["1. Overview & KPIs", "2. Financial Reconciliation"]:
 # -----------------------------------------------------------------------------
 if nav_selection in ["1. Overview & KPIs", "3. Discrepancy Analysis"]:
     st.divider()
-    st.subheader("3. Discrepancy Analysis")
-    st.caption("Distribution of exception categories by volume and monetary impact.")
+    st.subheader("3. Discrepancy & Anomaly Analysis")
+    st.caption("Distribution of reconciliation exceptions categorized by volume and monetary balance impact.")
 
     col_chart1, col_chart2 = st.columns(2)
 
-    # Prepare Discrepancy Data
     cat_names = []
     cat_counts = []
     cat_amounts = []
     cat_colors = []
 
     for status in ReconciliationStatus:
-        if status.value == ReconciliationStatus.MATCHED.value:
+        if status.value in [ReconciliationStatus.MATCHED.value, ReconciliationStatus.POST_CUTOFF_TRANSACTION.value]:
             continue
         m = summary["status_metrics"][status.value]
         if m["count"] > 0:
             cat_names.append(STATUS_LABELS.get(status.value, status.value))
             cat_counts.append(m["count"])
-            # Financial impact: for unmatched/duplicate/orphan it's bank amount; for unsettled/late it's platform amount; for mismatch/rounding it's diff
             if status in [ReconciliationStatus.UNSETTLED, ReconciliationStatus.LATE_SETTLEMENT, ReconciliationStatus.REFUND_EXCEEDS_PAYMENT]:
                 amt = float(m["platform_amount"])
             elif status in [ReconciliationStatus.DUPLICATE_SETTLEMENT, ReconciliationStatus.ORPHAN_REFUND, ReconciliationStatus.UNMATCHED_BANK_ENTRY]:
@@ -629,42 +862,52 @@ if nav_selection in ["1. Overview & KPIs", "3. Discrepancy Analysis"]:
 
     with col_chart1:
         if cat_counts:
-            fig_pie = px.pie(
-                names=cat_names,
-                values=cat_counts,
-                title="Exception Volume by Category",
-                color=cat_names,
-                color_discrete_sequence=cat_colors,
-                hole=0.45,
+            fig_donut = go.Figure(
+                go.Pie(
+                    labels=cat_names,
+                    values=cat_counts,
+                    hole=0.55,
+                    marker=dict(colors=cat_colors),
+                    textinfo="label+value",
+                    textfont=dict(size=11),
+                    hovertemplate="<b>%{label}</b><br>Exceptions: %{value}<br>Share: %{percent}<extra></extra>",
+                )
             )
-            fig_pie.update_layout(
-                paper_bgcolor="#FFFFFF",
-                plot_bgcolor="#FFFFFF",
-                height=350,
-                margin=dict(l=10, r=10, t=40, b=10),
-            )
-            st.plotly_chart(fig_pie, use_container_width=True)
-        else:
-            st.success("No exceptions found. Datasets match completely.")
-
-    with col_chart2:
-        if cat_amounts:
-            fig_bar = px.bar(
-                x=cat_names,
-                y=cat_amounts,
-                title="Monetary Impact by Exception Category (₹)",
-                color=cat_names,
-                color_discrete_sequence=cat_colors,
-                labels={"x": "Exception Category", "y": "Monetary Value (₹)"},
-            )
-            fig_bar.update_layout(
+            fig_donut.update_layout(
+                title=dict(text="<b>Exception Volume Breakdown</b>", font=dict(size=14, color="#0F172A")),
                 paper_bgcolor="#FFFFFF",
                 plot_bgcolor="#FFFFFF",
                 height=350,
                 showlegend=False,
                 margin=dict(l=10, r=10, t=40, b=10),
             )
-            st.plotly_chart(fig_bar, use_container_width=True)
+            st.plotly_chart(fig_donut, use_container_width=True)
+        else:
+            st.success("No exceptions found. Datasets match completely.")
+
+    with col_chart2:
+        if cat_amounts:
+            fig_hbar = go.Figure(
+                go.Bar(
+                    x=cat_amounts,
+                    y=cat_names,
+                    orientation="h",
+                    marker=dict(color=cat_colors),
+                    text=[f"₹{a:,.2f}" for a in cat_amounts],
+                    textposition="auto",
+                    hovertemplate="<b>%{y}</b><br>Financial Impact: ₹%{x:,.2f}<extra></extra>",
+                )
+            )
+            fig_hbar.update_layout(
+                title=dict(text="<b>Monetary Balance Impact (₹)</b>", font=dict(size=14, color="#0F172A")),
+                paper_bgcolor="#FFFFFF",
+                plot_bgcolor="#FFFFFF",
+                height=350,
+                xaxis=dict(title="Monetary Impact (₹)", gridcolor="#F1F5F9"),
+                yaxis=dict(autorange="reversed"),
+                margin=dict(l=10, r=10, t=40, b=10),
+            )
+            st.plotly_chart(fig_hbar, use_container_width=True)
 
 
 # -----------------------------------------------------------------------------
@@ -673,19 +916,42 @@ if nav_selection in ["1. Overview & KPIs", "3. Discrepancy Analysis"]:
 if nav_selection in ["4. Transaction Explorer"]:
     st.divider()
     st.subheader("4. Transaction & Settlement Explorer")
-    st.caption("Search, filter, and inspect line-item reconciliation results across all records.")
+    st.caption("Forensic line-item audit table. Search by ID, filter by category, or export filtered views.")
 
-    # Explorer Filters
-    f_col1, f_col2, f_col3, f_col4 = st.columns([2, 2, 2, 2])
+    # Quick Preset Pills
+    preset_cols = st.columns([1, 1, 1, 1, 1])
+    with preset_cols[0]:
+        btn_all = st.button(f"All Records ({len(reconciled_df)})", use_container_width=True)
+    with preset_cols[1]:
+        btn_exc = st.button(f"Exceptions Only ({len(exceptions_df)})", use_container_width=True)
+    with preset_cols[2]:
+        btn_match = st.button(f"Matched ({summary['matched_count']})", use_container_width=True)
+    with preset_cols[3]:
+        btn_late = st.button(f"Late Settled ({summary['late_settlement_count']})", use_container_width=True)
+    with preset_cols[4]:
+        btn_dup = st.button(f"Duplicates ({summary['duplicate_settlement_count']})", use_container_width=True)
+
+    default_status_filter = []
+    if btn_exc:
+        default_status_filter = [st_val for st_val in STATUS_LABELS.keys() if st_val != ReconciliationStatus.MATCHED.value]
+    elif btn_match:
+        default_status_filter = [ReconciliationStatus.MATCHED.value]
+    elif btn_late:
+        default_status_filter = [ReconciliationStatus.LATE_SETTLEMENT.value]
+    elif btn_dup:
+        default_status_filter = [ReconciliationStatus.DUPLICATE_SETTLEMENT.value]
+
+    # Explorer Filter Bar
+    f_col1, f_col2, f_col3, f_col4 = st.columns([2, 2, 1.5, 2])
 
     with f_col1:
-        search_query = st.text_input("🔍 Search Transaction / Settlement ID", "")
+        search_query = st.text_input("🔍 Search Transaction / Settlement ID", placeholder="e.g. TXN1001, SET5001")
     with f_col2:
         status_filter = st.multiselect(
-            "Filter by Status",
+            "Reconciliation Status",
             options=list(STATUS_LABELS.keys()),
             format_func=lambda x: STATUS_LABELS.get(x, x),
-            default=[],
+            default=default_status_filter,
         )
     with f_col3:
         type_filter = st.multiselect(
@@ -699,10 +965,10 @@ if nav_selection in ["4. Transaction Explorer"]:
             min_value=0.0,
             max_value=30000.0,
             value=(0.0, 30000.0),
-            step=100.0,
+            step=250.0,
         )
 
-    # Filter DataFrame
+    # Filter Logic
     filtered_df = reconciled_df.copy()
 
     if search_query:
@@ -725,9 +991,8 @@ if nav_selection in ["4. Transaction Explorer"]:
         (filtered_df["platform_amount"] <= amount_range[1]) | (filtered_df["bank_amount"] <= amount_range[1])
     ]
 
-    st.write(f"Showing **{len(filtered_df)}** of **{len(reconciled_df)}** records:")
+    st.markdown(f"Displaying **{len(filtered_df)}** of **{len(reconciled_df)}** records:")
 
-    # Display Styled Table
     display_cols = [
         "transaction_id",
         "settlement_id",
@@ -740,15 +1005,24 @@ if nav_selection in ["4. Transaction Explorer"]:
         "reconciliation_status",
         "explanation",
     ]
-    
+
     st.dataframe(
-        filtered_df[display_cols].style.format({
-            "platform_amount": "₹{:,.2f}",
-            "bank_amount": "₹{:,.2f}",
-            "difference": "₹{:,.2f}",
-        }),
+        filtered_df[display_cols],
+        column_config={
+            "transaction_id": st.column_config.TextColumn("Transaction ID", width="medium"),
+            "settlement_id": st.column_config.TextColumn("Settlement ID", width="medium"),
+            "transaction_date": st.column_config.TextColumn("Txn Date", width="small"),
+            "settlement_date": st.column_config.TextColumn("Settle Date", width="small"),
+            "transaction_type": st.column_config.TextColumn("Type", width="small"),
+            "platform_amount": st.column_config.NumberColumn("Platform Amount", format="₹ %.2f"),
+            "bank_amount": st.column_config.NumberColumn("Bank Amount", format="₹ %.2f"),
+            "difference": st.column_config.NumberColumn("Variance", format="₹ %.2f"),
+            "reconciliation_status": st.column_config.TextColumn("Status", width="medium"),
+            "explanation": st.column_config.TextColumn("Audit Explanation", width="large"),
+        },
         use_container_width=True,
-        height=450,
+        height=480,
+        hide_index=True,
     )
 
 
@@ -757,15 +1031,14 @@ if nav_selection in ["4. Transaction Explorer"]:
 # -----------------------------------------------------------------------------
 if nav_selection in ["5. Exception Investigation"]:
     st.divider()
-    st.subheader("5. Line-Item Exception Investigation")
-    st.caption("Deep-dive forensic audit for exceptions, root-cause explanations, and recommended accounting actions.")
+    st.subheader("5. Line-Item Forensic Investigation Dossier")
+    st.caption("Deep-dive forensic audit card comparing Platform records against Bank Settlements with corrective recommendations.")
 
     if exceptions_df.empty:
         st.success("🎉 No reconciliation exceptions found! All records matched perfectly.")
     else:
-        # Quick selector of exceptions
         exception_options = exceptions_df.apply(
-            lambda r: f"[{r['reconciliation_status']}] {r['transaction_id']} (Bank: {r['settlement_id']}) - Diff: ₹{r['difference']:.2f}",
+            lambda r: f"[{r['reconciliation_status']}] {r['transaction_id']} (Bank: {r['settlement_id']}) — Diff: ₹{r['difference']:.2f}",
             axis=1,
         ).tolist()
 
@@ -776,20 +1049,20 @@ if nav_selection in ["5. Exception Investigation"]:
         status_key = selected_record["reconciliation_status"]
         status_color = STATUS_COLORS.get(status_key, "#1E3A8A")
 
-        # Dossier card
+        # Visual Dossier Card
         st.markdown(
             f"""
-            <div class="investigation-card" style="border-left-color: {status_color};">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <div class="dossier-card" style="border-left: 5px solid {status_color};">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                     <div>
-                        <span style="font-size: 1.3rem; font-weight: 700; color: #0F172A;">
-                            Transaction ID: {selected_record['transaction_id']}
+                        <span style="font-size: 1.35rem; font-weight: 800; color: #0F172A;">
+                            Investigation Dossier: {selected_record['transaction_id']}
                         </span>
-                        &nbsp;&nbsp;
-                        <span style="font-size: 0.95rem; color: #64748B;">Settlement ID: {selected_record['settlement_id']}</span>
+                        &nbsp;&bull;&nbsp;
+                        <span style="font-size: 0.95rem; color: #64748B;">Bank Ref: <b>{selected_record['settlement_id']}</b></span>
                     </div>
                     <div>
-                        <span class="status-pill" style="background-color: {status_color}1A; color: {status_color}; border: 1px solid {status_color};">
+                        <span class="status-pill" style="background-color: {status_color}18; color: {status_color}; border: 1px solid {status_color};">
                             {STATUS_LABELS.get(status_key, status_key)}
                         </span>
                     </div>
@@ -800,26 +1073,99 @@ if nav_selection in ["5. Exception Investigation"]:
         )
 
         st.markdown("<br>", unsafe_allow_html=True)
-        col_inv1, col_inv2, col_inv3, col_inv4 = st.columns(4)
-        with col_inv1:
-            st.metric("Platform Expected Amount", format_inr(selected_record["platform_amount"]))
-            st.caption(f"Transaction Date: `{selected_record['transaction_date']}`")
-        with col_inv2:
-            st.metric("Bank Settled Amount", format_inr(selected_record["bank_amount"]))
-            st.caption(f"Settlement Date: `{selected_record['settlement_date']}`")
-        with col_inv3:
-            diff_val = selected_record["difference"]
-            st.metric("Financial Variance", format_inr(diff_val), delta=float(diff_val))
-            days_str = f"{selected_record['days_to_settle']} days" if pd.notna(selected_record['days_to_settle']) else "N/A"
-            st.caption(f"Settlement Delay: `{days_str}`")
-        with col_inv4:
-            st.metric("Transaction Type", selected_record["transaction_type"])
-            st.caption(f"Cutoff Date: `{current_cutoff}`")
+        col_p_dossier, col_b_dossier, col_var_dossier = st.columns([1, 1, 1])
 
-        st.markdown("#### 📖 Financial Explanation")
+        with col_p_dossier:
+            st.markdown(
+                f"""
+                <div class="dossier-panel">
+                    <div style="font-weight: 700; color: #1E3A8A; margin-bottom: 12px; font-size: 0.90rem;">
+                        💳 PLATFORM TRANSACTION LEDGER
+                    </div>
+                    <div class="dossier-field">
+                        <div class="dossier-field-label">Transaction ID</div>
+                        <div class="dossier-field-value">{selected_record['transaction_id']}</div>
+                    </div>
+                    <div class="dossier-field">
+                        <div class="dossier-field-label">Capture Date</div>
+                        <div class="dossier-field-value">{selected_record['transaction_date']}</div>
+                    </div>
+                    <div class="dossier-field">
+                        <div class="dossier-field-label">Expected Amount</div>
+                        <div class="dossier-field-value">{format_inr(selected_record['platform_amount'])}</div>
+                    </div>
+                    <div class="dossier-field">
+                        <div class="dossier-field-label">Type</div>
+                        <div class="dossier-field-value">{selected_record['transaction_type']}</div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        with col_b_dossier:
+            st.markdown(
+                f"""
+                <div class="dossier-panel">
+                    <div style="font-weight: 700; color: #059669; margin-bottom: 12px; font-size: 0.90rem;">
+                        🏦 BANK SETTLEMENT STATEMENT
+                    </div>
+                    <div class="dossier-field">
+                        <div class="dossier-field-label">Settlement ID</div>
+                        <div class="dossier-field-value">{selected_record['settlement_id']}</div>
+                    </div>
+                    <div class="dossier-field">
+                        <div class="dossier-field-label">Settlement Date</div>
+                        <div class="dossier-field-value">{selected_record['settlement_date']}</div>
+                    </div>
+                    <div class="dossier-field">
+                        <div class="dossier-field-label">Settled Amount</div>
+                        <div class="dossier-field-value">{format_inr(selected_record['bank_amount'])}</div>
+                    </div>
+                    <div class="dossier-field">
+                        <div class="dossier-field-label">Clearing Delay</div>
+                        <div class="dossier-field-value">{f"{selected_record['days_to_settle']} days" if pd.notna(selected_record['days_to_settle']) else "N/A"}</div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        with col_var_dossier:
+            diff_val = selected_record["difference"]
+            diff_color = "#DC2626" if diff_val < 0 else ("#059669" if diff_val > 0 else "#64748B")
+            st.markdown(
+                f"""
+                <div class="dossier-panel" style="border-left: 3px solid {diff_color};">
+                    <div style="font-weight: 700; color: #0F172A; margin-bottom: 12px; font-size: 0.90rem;">
+                        ⚖️ VARIANCE & AUDIT TRAIL
+                    </div>
+                    <div class="dossier-field">
+                        <div class="dossier-field-label">Monetary Variance</div>
+                        <div class="dossier-field-value" style="color: {diff_color};">{format_inr(diff_val)}</div>
+                    </div>
+                    <div class="dossier-field">
+                        <div class="dossier-field-label">Period Cutoff</div>
+                        <div class="dossier-field-value">{current_cutoff}</div>
+                    </div>
+                    <div class="dossier-field">
+                        <div class="dossier-field-label">Exception Status</div>
+                        <div class="dossier-field-value">{STATUS_LABELS.get(status_key, status_key)}</div>
+                    </div>
+                    <div class="dossier-field">
+                        <div class="dossier-field-label">Variance Direction</div>
+                        <div class="dossier-field-value">{"Net Cash Deficit" if diff_val < 0 else ("Net Cash Surplus" if diff_val > 0 else "Balanced")}</div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("#### 📖 Financial Root Cause")
         st.info(selected_record["explanation"], icon="ℹ️")
 
-        st.markdown("#### 🛠️ Recommended Action")
+        st.markdown("#### 🛠️ Recommended Accounting Action")
         st.warning(selected_record["suggested_action"], icon="👉")
 
 
@@ -837,7 +1183,7 @@ if nav_selection in ["6. Download Reports"]:
     # 2. Exceptions Only CSV
     exceptions_csv = exceptions_df.to_csv(index=False).encode("utf-8")
     
-    # 3. Financial Summary CSV
+    # 3. Financial Summary CSV with disaggregated fields
     summary_data = [
         {"Metric": "Cutoff Date", "Value": str(current_cutoff)},
         {"Metric": "Rounding Tolerance", "Value": str(current_tolerance)},
@@ -878,8 +1224,15 @@ if nav_selection in ["6. Download Reports"]:
     col_d1, col_d2, col_d3 = st.columns(3)
 
     with col_d1:
-        st.markdown("##### 📄 Full Reconciliation Report")
-        st.write(f"Contains all {len(reconciled_df)} transaction-level matched and exception entries.")
+        st.markdown(
+            f"""
+            <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 18px; margin-bottom: 12px;">
+                <b style="font-size: 1.05rem; color: #0F172A;">📄 Full Reconciliation Ledger</b><br>
+                <span style="font-size: 0.82rem; color: #64748B;">Complete dataset with all {len(reconciled_df)} transactions and matched settlements.</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         st.download_button(
             label="📥 Download Full Report (CSV)",
             data=full_csv,
@@ -889,8 +1242,15 @@ if nav_selection in ["6. Download Reports"]:
         )
 
     with col_d2:
-        st.markdown("##### ⚠️ Exceptions Only Report")
-        st.write(f"Filtered log of {len(exceptions_df)} discrepancy records requiring audit or adjustment.")
+        st.markdown(
+            f"""
+            <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 18px; margin-bottom: 12px;">
+                <b style="font-size: 1.05rem; color: #0F172A;">⚠️ Exceptions & Variances Only</b><br>
+                <span style="font-size: 0.82rem; color: #64748B;">Filtered ledger of {len(exceptions_df)} discrepancies requiring operational or audit clearance.</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         st.download_button(
             label="📥 Download Exceptions Report (CSV)",
             data=exceptions_csv,
@@ -900,8 +1260,15 @@ if nav_selection in ["6. Download Reports"]:
         )
 
     with col_d3:
-        st.markdown("##### 📊 Financial Summary Sheet")
-        st.write("Aggregated ledger totals, gross/refund/net reconciliation, and variance metrics.")
+        st.markdown(
+            f"""
+            <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 18px; margin-bottom: 12px;">
+                <b style="font-size: 1.05rem; color: #0F172A;">📊 Financial Summary Sheet</b><br>
+                <span style="font-size: 0.82rem; color: #64748B;">Aggregated metrics, Gross/Net balances, and the verified mathematical bridge.</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         st.download_button(
             label="📥 Download Summary (CSV)",
             data=summary_csv,
