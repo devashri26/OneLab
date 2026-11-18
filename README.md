@@ -4,7 +4,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.35%2B-FF4B4B.svg)](https://streamlit.io/)
 [![Plotly](https://img.shields.io/badge/Plotly-5.20%2B-3F4F75.svg)](https://plotly.com/)
-[![Pytest](https://img.shields.io/badge/Pytest-16%20Passed-brightgreen.svg)](https://pytest.org/)
+[![Pytest](https://img.shields.io/badge/Pytest-21%20Passed-brightgreen.svg)](https://pytest.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)]()
 
 ---
@@ -47,7 +47,7 @@ Without automated reconciliation, finance teams spend days manually cross-refere
 * **Indian Rupee Formatting**: Dynamic Lakh/Crore grouping (`₹12,34,567.89`) across all dashboards and reports.
 * **Dynamic Waterfall Reconciliation Bridge**: Interactive Plotly waterfall chart visualizing the bridge from Platform Net Revenue to Bank Net Settled Cash.
 * **Robust CSV Validation Engine**: Comprehensive schema and data type validation guarding against missing headers, invalid dates, negative payment amounts, and malformed files without crashing.
-* **16 Automated Pytest Cases**: Comprehensive automated test coverage for all rules and edge cases.
+* **21 Automated Pytest Cases**: Comprehensive automated test coverage for all rules, cumulative refunds, and independent auditor edge cases.
 
 ---
 
@@ -102,7 +102,8 @@ payment-reconciliation/
 │
 ├── tests/                      # Automated test suite
 │   ├── __init__.py
-│   └── test_reconciliation.py  # 16 automated test cases (TC01 - TC16)
+│   ├── test_reconciliation.py  # 16 core automated test cases (TC01 - TC16)
+│   └── test_audit_independent.py # 5 independent financial auditor test cases (AUDIT-01 to AUDIT-05)
 │
 └── docs/                       # Project documentation
     ├── assumptions.md          # Business, accounting, and technical assumptions
